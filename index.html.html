@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Kingdom of Shadows</title>
+<style>
+  :root{
+    --gold:#d4af37; --gold-bright:#f4d160;
+    --hp:#c0392b; --hp-dark:#5c1a12;
+    --mp:#2f80c9; --mp-dark:#123a5c;
+    --xp:#9b59b6; --xp-dark:#3f1f52;
+    --panel-bg: rgba(12,8,20,0.74);
+    --panel-border: rgba(212,175,55,0.55);
+    --text-light:#f1e6cf;
+    --text-dim:#c9bd9e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;
+    font-family:Georgia,'Times New Roman',serif;color:var(--text-light);}
+  #gameContainer{position:relative;width:100vw;height:100vh;}
+  #gameCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#000;}
+
+  .panel{
+    background:var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    box-shadow:0 0 18px rgba(212,175,55,0.15), inset 0 0 20px rgba(0,0,0,0.4);
+    backdrop-filter:blur(3px);
+    padding:10px 12px;
+  }
+  .eyebrow{
+    font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);
+    opacity:.85;margin-bottom:4px;
+  }
+
+  /* ---------- HUD LAYOUT ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;display:none;font-size:14px;}
+  #hud .panel{pointer-events:auto;}
+
+  #barsPanel{position:absolute;top:16px;left:16px;width:250px;}
+  .stat-row{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+  .stat-row:last-child{margin-bottom:0;}
+  .stat-icon{width:20px;text-align:center;font-size:14px;flex:0 0 auto;}
+  .stat-bar{position:relative;flex:1;height:18px;background:rgba(0,0,0,0.55);
+    border:1px solid var(--panel-border);border-radius:5px;overflow:hidden;}
+  .bar-fill{height:100%;width:100%;transition:width .25s ease;}
+  .hp .bar-fill{background:linear-gradient(90deg,var(--hp-dark),var(--hp));}
+  .mp .bar-fill{background:linear-gradient(90deg,var(--mp-dark),var(--mp));}
+  .xp .bar-fill{background:linear-gradient(90deg,var(--xp-dark),var(--xp));}
+  .bar-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:10px;text-shadow:0 1px 2px #000;letter-spacing:.5px;color:#fff;}
+  #levelBadge{position:absolute;top:-10px;left:-10px;background:radial-gradient(circle,var(--gold-bright),var(--gold));
+    color:#2a1a04;font-weight:bold;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;
+    justify-content:center;font-size:11px;box-shadow:0 0 10px rgba(212,175,55,0.8);border:2px solid #3a2504;}
+
+  #topRightWrap{position:absolute;top:16px;right:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;}
+  #statusPanel{display:flex;gap:16px;align-items:center;}
+  .status-item{display:flex;align-items:center;gap:6px;font-size:15px;}
+  #minimapPanel{padding:6px;}
+  #minimapCanvas{display:block;border-radius:6px;}
+
+  #questBanner{position:absolute;top:16px;left:50%;transform:translateX(-50%);
+    max-width:480px;text-align:center;}
+  #questBanner .eyebrow{text-align:center;}
+  #questText{font-size:13px;line-height:1.4;color:var(--text-light);}
+
+  #bottomLeftWrap{position:absolute;bottom:16px;left:16px;display:flex;flex-direction:column;gap:10px;}
+  #weaponPanel{display:flex;align-items:center;gap:10px;min-width:200px;}
+  #weaponIcon{font-size:26px;}
+  #weaponName{font-weight:bold;color:var(--gold-bright);font-size:13px;}
+  #weaponDmg{font-size:11px;color:var(--text-dim);}
+  #invGrid{display:grid;grid-template-columns:repeat(6,40px);grid-gap:6px;}
+  .inv-slot{width:40px;height:40px;border:1px solid var(--panel-border);border-radius:6px;
+    background:rgba(0,0,0,0.4);position:relative;display:flex;align-items:center;justify-content:center;
+    font-size:19px;cursor:pointer;transition:transform .15s, box-shadow .15s;}
+  .inv-slot:hover{transform:translateY(-2px);box-shadow:0 0 10px rgba(212,175,55,0.5);}
+  .inv-slot.empty{cursor:default;opacity:.4;}
+  .inv-slot.empty:hover{transform:none;box-shadow:none;}
+  .inv-slot.equipped{border-color:var(--gold-bright);box-shadow:0 0 8px rgba(244,209,96,0.7);}
+  .inv-count{position:absolute;bottom:1px;right:3px;font-size:9px;background:rgba(0,0,0,0.7);
+    padding:0 3px;border-radius:3px;color:var(--gold-bright);}
+
+  #controlsHint{position:absolute;bottom:16px;right:16px;font-size:11px;color:var(--text-dim);
+    text-align:right;line-height:1.6;max-width:230px;}
+  #controlsHint b{color:var(--gold-bright);}
+
+  #toastContainer{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);
+    display:flex;flex-direction:column-reverse;gap:6px;align-items:center;pointer-events:none;}
+  .toast{background:rgba(10,6,16,0.85);border:1px solid var(--panel-border);border-radius:8px;
+    padding:7px 14px;font-size:13px;opacity:0;transform:translateY(10px);
+    transition:opacity .35s, transform .35s;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translateY(0);}
+
+  #regionCard{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);
+    text-align:center;opacity:0;transition:opacity 1s ease;pointer-events:none;}
+  #regionCard .rc-name{font-size:38px;letter-spacing:4px;color:var(--gold-bright);
+    text-shadow:0 0 20px rgba(212,175,55,0.7),0 2px 6px #000;font-variant:small-caps;}
+  #regionCard .rc-sub{font-size:13px;color:var(--text-dim);letter-spacing:2px;margin-top:6px;}
+
+  /* ---------- OVERLAYS ---------- */
+  .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center, rgba(20,10,30,0.92), rgba(0,0,0,0.98));
+    z-index:20;flex-direction:column;text-align:center;padding:20px;}
+  .overlay.show{display:flex;}
+  .title-main{font-size:min(9vw,72px);letter-spacing:10px;color:var(--gold-bright);
+    text-shadow:0 0 30px rgba(212,175,55,0.6),0 0 70px rgba(120,60,200,0.4);
+    font-variant:small-caps;margin-bottom:6px;
+    animation:flicker 4s infinite ease-in-out;}
+  @keyframes flicker{0%,100%{opacity:1;}50%{opacity:.88;}52%{opacity:1;}54%{opacity:.92;}}
+  .title-sub{color:var(--text-dim);letter-spacing:4px;font-size:14px;margin-bottom:36px;}
+  .fancy-btn{
+    background:linear-gradient(180deg,#2a1a3a,#160c22);
+    border:1px solid var(--gold);color:var(--gold-bright);
+    padding:14px 38px;font-size:16px;letter-spacing:3px;border-radius:6px;cursor:pointer;
+    font-family:Georgia,serif;text-transform:uppercase;
+    box-shadow:0 0 20px rgba(212,175,55,0.25);transition:all .2s;
+  }
+  .fancy-btn:hover{box-shadow:0 0 30px rgba(212,175,55,0.6);transform:translateY(-2px);background:linear-gradient(180deg,#3a2450,#1c1030);}
+  .controls-list{margin-top:34px;font-size:12.5px;color:var(--text-dim);line-height:2;}
+  .controls-list b{color:var(--gold-bright);}
+  .overlay-stats{margin:18px 0 30px;font-size:14px;color:var(--text-light);line-height:1.9;}
+  .overlay-stats span{color:var(--gold-bright);font-weight:bold;}
+
+  #fadeOverlay{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;
+    transition:opacity .4s ease;z-index:15;}
+  #fadeOverlay.show{opacity:1;}
+
+  #dialogOverlay{position:absolute;bottom:0;left:0;right:0;display:none;justify-content:center;
+    padding-bottom:40px;z-index:18;}
+  #dialogOverlay.show{display:flex;}
+  #dialogBox{max-width:560px;text-align:center;}
+  #dialogBox .eyebrow{text-align:center;}
+  #dialogText{font-size:14px;line-height:1.6;font-style:italic;color:var(--text-light);}
+  #dialogHint{margin-top:10px;font-size:11px;color:var(--gold);letter-spacing:1px;}
+
+  #muteBtn{position:absolute;top:16px;left:280px;pointer-events:auto;cursor:pointer;
+    width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+
+  ::-webkit-scrollbar{display:none;}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+  <div id="fadeOverlay"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="barsPanel" class="panel" style="position:relative;">
+      <div id="levelBadge">Lv 1</div>
+      <div class="stat-row hp">
+        <div class="stat-icon">❤️</div>
+        <div class="stat-bar"><div class="bar-fill" id="hpFill"></div><div class="bar-label" id="hpLabel">100/100</div></div>
+      </div>
+      <div class="stat-row mp">
+        <div class="stat-icon">💧</div>
+        <div class="stat-bar"><div class="bar-fill" id="mpFill"></div><div class="bar-label" id="mpLabel">50/50</div></div>
+      </div>
+      <div class="stat-row xp">
+        <div class="stat-icon">⭐</div>
+        <div class="stat-bar"><div class="bar-fill" id="xpFill"></div><div class="bar-label" id="xpLabel">0/50</div></div>
+      </div>
+    </div>
+
+    <div id="muteBtn" class="panel">🔊</div>
+
+    <div id="topRightWrap">
+      <div id="statusPanel" class="panel">
+        <div class="status-item">🪙 <span id="goldCount">0</span></div>
+        <div class="status-item">🔮 <span id="shardCount">0/5</span></div>
+        <div class="status-item"><span id="dayNightIcon">☀️</span> <span id="dayNightLabel">Day</span></div>
+      </div>
+      <div id="minimapPanel" class="panel">
+        <div class="eyebrow" style="text-align:center;">Map</div>
+        <canvas id="minimapCanvas" width="160" height="110"></canvas>
+      </div>
+    </div>
+
+    <div id="questBanner" class="panel">
+      <div class="eyebrow">Current Quest</div>
+      <div id="questText">—</div>
+    </div>
+
+    <div id="bottomLeftWrap">
+      <div id="weaponPanel" class="panel">
+        <div id="weaponIcon">🗡️</div>
+        <div>
+          <div id="weaponName">Rusty Sword</div>
+          <div id="weaponDmg">Damage 8</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="eyebrow">Inventory</div>
+        <div id="invGrid"></div>
+      </div>
+    </div>
+
+    <div id="controlsHint" class="panel">
+      <b>WASD/Arrows</b> Move &nbsp; <b>Space</b> Attack<br>
+      <b>Shift+Space</b> Power Attack (10 MP)<br>
+      <b>E</b> Interact / Open &nbsp; <b>M</b> Mute<br>
+      <span style="color:var(--gold-bright)">Wander off the path — secrets await.</span>
+    </div>
+
+    <div id="toastContainer"></div>
+    <div id="regionCard"><div class="rc-name" id="rcName"></div><div class="rc-sub" id="rcSub"></div></div>
+  </div>
+
+  <!-- Dialog -->
+  <div id="dialogOverlay">
+    <div id="dialogBox" class="panel">
+      <div class="eyebrow">A Voice Speaks</div>
+      <div id="dialogText"></div>
+      <div id="dialogHint">Press E to continue</div>
+    </div>
+  </div>
+
+  <!-- Title -->
+  <div id="titleScreen" class="overlay show">
+    <div class="title-main">Kingdom of Shadows</div>
+    <div class="title-sub">A realm of nine lands awaits your light</div>
+    <button class="fancy-btn" id="startBtn">Begin Journey</button>
+    <div class="controls-list">
+      <b>WASD / Arrow Keys</b> — Move &nbsp;&nbsp; <b>Space</b> — Attack<br>
+      <b>Shift + Space</b> — Power Attack &nbsp;&nbsp; <b>E</b> — Interact / Open Chests<br>
+      Explore every shadow. Hidden shards are needed to reach the Final Fortress.
+    </div>
+  </div>
+
+  <!-- Victory -->
+  <div id="victoryOverlay" class="overlay">
+    <div class="title-main" style="font-size:42px;">Darkness Falls Away</div>
+    <div class="title-sub">The Shadow King is no more</div>
+    <div class="overlay-stats" id="victoryStats"></div>
+    <button class="fancy-btn" id="victoryRestart">Play Again</button>
+  </div>
+
+  <!-- Game Over -->
+  <div id="gameoverOverlay" class="overlay">
+    <div class="title-main" style="font-size:42px;color:#c0392b;">You Have Fallen</div>
+    <div class="title-sub">The shadows claim another soul</div>
+    <button class="fancy-btn" id="gameoverRestart">Try Again</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================= UTILITIES ============================= */
+function clamp(v,mn,mx){return Math.max(mn,Math.min(mx,v));}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function lerpColor(c1,c2,t){
+  const p=parseInt(c1.slice(1),16), q=parseInt(c2.slice(1),16);
+  const r1=(p>>16)&255,g1=(p>>8)&255,b1=p&255;
+  const r2=(q>>16)&255,g2=(q>>8)&255,b2=q&255;
+  const r=Math.round(r1+(r2-r1)*t), g=Math.round(g1+(g2-g1)*t), b=Math.round(b1+(b2-b1)*t);
+  return `rgb(${r},${g},${b})`;
+}
+function mulberry32(a){
+  return function(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+/* ============================= CANVAS SETUP ============================= */
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const minimapCanvas=document.getElementById('minimapCanvas');
+const mctx=minimapCanvas.getContext('2d');
+const lightingCanvas=document.createElement('canvas');
+const lctx=lightingCanvas.getContext('2d');
+
+let raindrops=[];
+function initRain(){
+  raindrops=[];
+  for(let i=0;i<150;i++){
+    raindrops.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,len:10+Math.random()*12,speed:420+Math.random()*220});
+  }
+}
+function resize(){
+  canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+  lightingCanvas.width=canvas.width;lightingCanvas.height=canvas.height;
+  initRain();
+}
+window.addEventListener('resize',resize);
+
+/* ============================= AUDIO ============================= */
+let audioCtx=null, masterGain=null, ambientNodes=null, muted=false;
+function initAudio(){
+  if(audioCtx)return;
+  try{
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    masterGain=audioCtx.createGain(); masterGain.gain.value=0.18; masterGain.connect(audioCtx.destination);
+    startAmbient();
+  }catch(e){ /* audio unavailable */ }
+}
+function startAmbient(){
+  if(!audioCtx)return;
+  const o1=audioCtx.createOscillator(); o1.type='sine'; o1.frequency.value=82;
+  const o2=audioCtx.createOscillator(); o2.type='sine'; o2.frequency.value=123;
+  const filt=audioCtx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=400;
+  const g=audioCtx.createGain(); g.gain.value=0.5;
+  const lfo=audioCtx.createOscillator(); lfo.type='sine'; lfo.frequency.value=0.05;
+  const lfoGain=audioCtx.createGain(); lfoGain.gain.value=120;
+  lfo.connect(lfoGain); lfoGain.connect(filt.frequency);
+  o1.connect(filt); o2.connect(filt); filt.connect(g); g.connect(masterGain);
+  o1.start(); o2.start(); lfo.start();
+  ambientNodes={o1,o2,lfo};
+}
+function toggleMute(){
+  muted=!muted;
+  if(masterGain)masterGain.gain.value=muted?0:0.18;
+  document.getElementById('muteBtn').textContent=muted?'🔇':'🔊';
+}
+function playTone(freq,dur,type,gainVal,delay){
+  if(!audioCtx||muted)return;
+  const t0=audioCtx.currentTime+(delay||0);
+  const o=audioCtx.createOscillator(); o.type=type||'sine'; o.frequency.setValueAtTime(freq,t0);
+  const g=audioCtx.createGain(); g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(gainVal||0.2,t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(t0); o.stop(t0+dur+0.05);
+}
+function playSwing(){ playTone(220,0.12,'sawtooth',0.12,0); playTone(140,0.1,'sawtooth',0.08,0.02); }
+function playPowerSwing(){ playTone(300,0.25,'sawtooth',0.18,0); playTone(150,0.3,'square',0.12,0.03); }
+function playHit(){ playTone(90,0.15,'sine',0.22,0); }
+function playChest(){ [523,659,784].forEach((f,i)=>playTone(f,0.18,'triangle',0.15,i*0.09)); }
+function playLevelUp(){ [392,523,659,784].forEach((f,i)=>playTone(f,0.22,'triangle',0.16,i*0.1)); }
+function playThunder(){
+  if(!audioCtx||muted)return;
+  const bufferSize=audioCtx.sampleRate*0.8;
+  const buffer=audioCtx.createBuffer(1,bufferSize,audioCtx.sampleRate);
+  const data=buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/bufferSize,2);
+  const src=audioCtx.createBufferSource(); src.buffer=buffer;
+  const filt=audioCtx.createBiquadFilter(); filt.type='lowpass'; filt.frequency.value=300;
+  const g=audioCtx.createGain(); g.gain.value=0.25;
+  src.connect(filt); filt.connect(g); g.connect(masterGain);
+  src.start();
+}
+function playVictory(){ [392,494,587,784,987].forEach((f,i)=>playTone(f,0.35,'triangle',0.18,i*0.15)); }
+
+/* ============================= WEAPON / LOOT ============================= */
+const WEAPON_POOL=[
+  {name:'Iron Sword',dmg:14,icon:'⚔️'},
+  {name:'Silver Blade',dmg:20,icon:'🔪'},
+  {name:'War Axe',dmg:27,icon:'🪓'},
+  {name:'Enchanted Blade',dmg:34,icon:'✨'},
+  {name:'Shadowbane',dmg:48,icon:'🌑'}
+];
+function lootTable(regionIndex,rng){
+  const r=rng();
+  if(r<0.34) return {type:'potion',name:'Health Potion',icon:'🧪',heal:35};
+  if(r<0.54) return {type:'mana',name:'Mana Potion',icon:'💧',mana:25};
+  if(r<0.72) return {type:'gold',amount:Math.round(15+regionIndex*8+rng()*20)};
+  if(r<0.86){ const hpBonus=15+regionIndex*5; return {type:'armor',name:'Warded Charm',icon:'🛡️',hpBonus}; }
+  const idx=clamp(Math.floor(regionIndex/1.6+rng()*1.6),0,WEAPON_POOL.length-1);
+  return Object.assign({type:'weapon'},WEAPON_POOL[idx]);
+}
+
+/* ============================= REGIONS ============================= */
+const REGIONS=[
+ { name:'Peaceful Village', worldW:1800, worldH:1000,
+   skyDay:['#8ecae6','#ffe8a3'], skyNight:['#0d1b2a','#1b263b'],
+   ground:'#6fa84a', obstacleType:'tree',
+   weather:{birds:true,fireflies:true,rain:false,wind:true,torches:false,crystals:false,lightning:false},
+   indoor:false, enemyType:{name:'Bandit',hp:20,dmg:4,color:'#8d6e63',speed:65},
+   enemyCount:2, chestCount:2, hasSecret:true, hasNPC:true,
+   npcText:'"Shadows stir beyond the old woods, traveler. Journey east through the Enchanted Forest and onward. Seek the hidden shards of shadow-glass along your path — the Fortress gate demands at least five before it will open."',
+   quest:'Speak with Elder Maren, then journey east into the Enchanted Forest.' },
+
+ { name:'Enchanted Forest', worldW:2000, worldH:1100,
+   skyDay:['#a8dadc','#fefae0'], skyNight:['#131a3a','#241b4a'],
+   ground:'#3f6b3a', obstacleType:'tree',
+   weather:{birds:true,fireflies:true,rain:false,wind:true,torches:false},
+   indoor:false, enemyType:{name:'Wild Wolf',hp:32,dmg:6,color:'#6d4c41',speed:110},
+   enemyCount:3, chestCount:2, hasSecret:true,
+   quest:'Push deeper through the Enchanted Forest to reach the Dark Forest.' },
+
+ { name:'Dark Forest', worldW:2000, worldH:1100,
+   skyDay:['#5c6b57','#7c8a6a'], skyNight:['#050508','#0d0f1a'],
+   ground:'#293522', obstacleType:'tree',
+   weather:{birds:false,fireflies:true,rain:true,wind:true,lightning:false},
+   indoor:false, enemyType:{name:'Shadow Wisp',hp:38,dmg:7,color:'#4a235a',speed:95},
+   enemyCount:4, chestCount:2, hasSecret:true,
+   quest:"Navigate the Dark Forest's twisted paths toward the Mountain Pass." },
+
+ { name:'Mountain Pass', worldW:2200, worldH:1000,
+   skyDay:['#b8c6db','#e8e4d0'], skyNight:['#141b30','#242c4a'],
+   ground:'#8d8172', obstacleType:'rock',
+   weather:{birds:true,fireflies:false,rain:true,wind:true,fog:true},
+   indoor:false, enemyType:{name:'Rock Golem',hp:55,dmg:9,color:'#5d5d5d',speed:58},
+   enemyCount:4, chestCount:2, hasSecret:true,
+   quest:'Climb through the Mountain Pass to reach the Ancient Ruins.' },
+
+ { name:'Ancient Ruins', worldW:2000, worldH:1100,
+   skyDay:['#e9d8a6','#f6efd9'], skyNight:['#101832','#1e2650'],
+   ground:'#b6a06f', obstacleType:'pillar',
+   weather:{birds:true,fireflies:true,rain:false,wind:false},
+   indoor:false, enemyType:{name:'Stone Guardian',hp:65,dmg:10,color:'#8a7f6b',speed:52},
+   enemyCount:4, chestCount:3, hasSecret:true,
+   quest:'Explore the Ancient Ruins and descend into the Crystal Cave.' },
+
+ { name:'Crystal Cave', worldW:1900, worldH:1000,
+   skyDay:['#241b3d','#2f1f4d'], skyNight:['#0a0716','#150c26'],
+   ground:'#241d38', obstacleType:'crystal',
+   weather:{birds:false,fireflies:false,rain:false,wind:false,crystals:true,torches:true},
+   indoor:true, enemyType:{name:'Crystal Spider',hp:60,dmg:11,color:'#4c1d95',speed:100},
+   enemyCount:5, chestCount:3, hasSecret:true,
+   quest:'Find your way through the glittering Crystal Cave to the Abandoned Castle.' },
+
+ { name:'Abandoned Castle', worldW:2000, worldH:1100,
+   skyDay:['#463e52','#5c5468'], skyNight:['#0c0a14','#161222'],
+   ground:'#3c3648', obstacleType:'wall',
+   weather:{birds:false,fireflies:false,rain:true,wind:false,torches:true},
+   indoor:true, enemyType:{name:'Ghost Knight',hp:75,dmg:13,color:'#c9c9d9',speed:72},
+   enemyCount:5, chestCount:3, hasSecret:true,
+   quest:"Search the Abandoned Castle's ruined halls, then descend into the Underground Dungeon." },
+
+ { name:'Underground Dungeon', worldW:2000, worldH:1100,
+   skyDay:['#241f26','#2c2530'], skyNight:['#050408','#0b0810'],
+   ground:'#1e191e', obstacleType:'wall',
+   weather:{birds:false,fireflies:false,rain:false,wind:false,torches:true},
+   indoor:true, enemyType:{name:'Dungeon Wraith',hp:85,dmg:15,color:'#1b1b2f',speed:88},
+   enemyCount:6, chestCount:3, hasSecret:true,
+   quest:'Brave the Underground Dungeon and gather Shadow Shards to unseal the Final Fortress.' },
+
+ { name:'Final Shadow Fortress', worldW:1800, worldH:1000,
+   skyDay:['#1a1024','#241030'], skyNight:['#050208','#0c0414'],
+   ground:'#160c22', obstacleType:'wall',
+   weather:{birds:false,fireflies:false,rain:true,wind:true,torches:true,lightning:true},
+   indoor:true, enemyType:{name:'Shadow Minion',hp:60,dmg:10,color:'#6b21a8',speed:100},
+   enemyCount:2, chestCount:1, hasSecret:false,
+   boss:{name:'Shadow King',hp:280,dmg:22,color:'#3b0764',speed:78},
+   quest:'Defeat the Shadow King and free the Kingdom from darkness.' }
+];
+
+function generateRegionContent(region,index){
+  if(region.generated)return;
+  const rng=mulberry32(2000+index*97);
+  const W=region.worldW,H=region.worldH;
+  region.obstacles=[];
+  const obstacleCount=16+index*2;
+  for(let i=0;i<obstacleCount;i++){
+    const x=40+rng()*(W-80), y=40+rng()*(H-80);
+    if(Math.hypot(x-90,y-H/2)<170)continue;
+    const r=16+rng()*16;
+    region.obstacles.push({x,y,r,type:region.obstacleType,seed:rng()*100});
+  }
+  region.enemies=[];
+  for(let i=0;i<region.enemyCount;i++){
+    let x,y,tries=0;
+    do{x=60+rng()*(W-120); y=60+rng()*(H-120); tries++;}while(Math.hypot(x-90,y-H/2)<300 && tries<40);
+    const et=region.enemyType;
+    region.enemies.push({x,y,hp:et.hp+Math.round(rng()*8),maxhp:et.hp,dmg:et.dmg,speed:et.speed,
+      color:et.color,name:et.name,radius:17,wanderAngle:rng()*Math.PI*2,wanderTimer:1+rng()*2,
+      hitCooldown:0,hitFlash:0,alive:true,isBoss:false});
+  }
+  if(region.boss){
+    const b=region.boss;
+    region.enemies.push({x:W-160,y:H/2,hp:b.hp,maxhp:b.hp,dmg:b.dmg,speed:b.speed,color:b.color,
+      name:b.name,radius:34,wanderAngle:0,wanderTimer:0,hitCooldown:0,hitFlash:0,alive:true,isBoss:true});
+  }
+  region.chests=[];
+  for(let i=0;i<region.chestCount;i++){
+    let x,y,tries=0;
+    do{x=60+rng()*(W-120);y=60+rng()*(H-120);tries++;}while(Math.hypot(x-90,y-H/2)<200 && tries<40);
+    region.chests.push({x,y,opened:false,item:lootTable(index,rng)});
+  }
+  if(region.hasSecret){
+    let x,y,tries=0;
+    do{x=60+rng()*(W-120);y=60+rng()*(H-120);tries++;}while(Math.hypot(x-90,y-H/2)<260 && tries<40);
+    region.secret={x,y,revealed:false,opened:false,item:{type:'shard'}};
+  } else region.secret=null;
+  region.torches=[];
+  if(region.weather.torches){
+    for(let i=0;i<6;i++)region.torches.push({x:60+rng()*(W-120),y:60+rng()*(H-120)});
+  }
+  region.birds=[];
+  if(region.weather.birds){
+    for(let i=0;i<6;i++)region.birds.push({x:rng()*W,y:80+rng()*(H*0.35),phase:rng()*6.28,speed:40+rng()*30});
+  }
+  region.fireflies=[];
+  if(region.weather.fireflies){
+    for(let i=0;i<24;i++)region.fireflies.push({x:rng()*W,y:rng()*H,vx:(rng()-0.5)*12,vy:(rng()-0.5)*12,phase:rng()*6.28});
+  }
+  if(region.hasNPC){ region.npc={x:230,y:H/2-50,text:region.npcText}; }
+  region.lightningTimer=6+rng()*8;
+  region.generated=true;
+}
+
+/* ============================= PLAYER ============================= */
+const player={
+  x:100,y:500,radius:14,speed:190,
+  hp:100,maxhp:100,mp:50,maxmp:50,xp:0,maxxp:50,level:1,gold:20,shards:0,
+  facing:0,attackCooldown:0,attacking:false,attackTimer:0,attackPower:false,invuln:0,noHitTimer:99,
+  weapon:{name:'Rusty Sword',dmg:9,icon:'🗡️'},
+  inventory:[ {type:'potion',name:'Health Potion',icon:'🧪',heal:35,count:2} ]
+};
+
+/* ============================= WORLD STATE ============================= */
+let currentRegionIndex=0;
+let transitioning=false;
+let portalWarnCooldown=0;
+let dayTime=0.22;
+const DAY_LENGTH=200;
+let lightningFlash=0;
+let gameState='title'; // title | playing | dialog | victory | gameover
+let startTime=0;
+
+function nightFactor(){
+  return (1-Math.cos((dayTime-0.25)*2*Math.PI))/2;
+}
+
+/* ============================= INPUT ============================= */
+const keys={};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  keys[k]=true;
+  if(k===' '){ e.preventDefault(); doAttack(!!keys['shift']); }
+  if(k==='e') doInteract();
+  if(k==='m') toggleMute();
+});
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+document.getElementById('muteBtn').addEventListener('click',toggleMute);
+
+/* ============================= TOASTS / DIALOG / REGION CARD ============================= */
+function addToast(msg){
+  const container=document.getElementById('toastContainer');
+  const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+  container.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),400); },2600);
+}
+function showRegionCard(name,sub){
+  document.getElementById('rcName').textContent=name;
+  document.getElementById('rcSub').textContent=sub||'';
+  const card=document.getElementById('regionCard');
+  card.style.opacity='1';
+  setTimeout(()=>{card.style.opacity='0';},2400);
+}
+function showDialog(text){
+  gameState='dialog';
+  document.getElementById('dialogText').textContent=text;
+  document.getElementById('dialogOverlay').classList.add('show');
+}
+function closeDialog(){
+  gameState='playing';
+  document.getElementById('dialogOverlay').classList.remove('show');
+}
+
+/* ============================= INVENTORY ============================= */
+function addItem(item){
+  if(item.type==='weapon'){
+    if(player.inventory.find(i=>i.name===item.name)){
+      player.gold+=20; addToast(`Duplicate ${item.name} found — converted to 20 gold`);
+    } else {
+      player.inventory.push(Object.assign({},item,{count:1,equipped:false}));
+      addToast(`New weapon found: ${item.name}!`);
+    }
+  } else if(item.type==='gold'){
+    player.gold+=item.amount; addToast(`+${item.amount} Gold`);
+  } else if(item.type==='shard'){
+    player.shards=Math.min(8,player.shards+1);
+    addToast(`✨ Shadow Shard acquired! (${player.shards}/5 needed)`);
+  } else if(item.type==='armor'){
+    player.maxhp+=item.hpBonus; player.hp+=item.hpBonus;
+    addToast(`Found ${item.name}! Max HP +${item.hpBonus}`);
+  } else {
+    const existing=player.inventory.find(i=>i.name===item.name);
+    if(existing) existing.count++;
+    else player.inventory.push(Object.assign({},item,{count:1}));
+    addToast(`Found ${item.name}!`);
+  }
+  renderInventory();
+}
+function onInventoryClick(idx){
+  const item=player.inventory[idx];
+  if(!item)return;
+  if(item.type==='weapon'){
+    player.inventory.forEach(i=>i.equipped=false);
+    item.equipped=true;
+    player.weapon={name:item.name,dmg:item.dmg,icon:item.icon};
+    addToast(`Equipped ${item.name}`);
+    updateWeaponDisplay();
+  } else if(item.type==='potion'){
+    if(player.hp>=player.maxhp){ addToast('Health already full'); return; }
+    player.hp=Math.min(player.maxhp,player.hp+(item.heal||35));
+    item.count--; addToast('Restored health');
+    if(item.count<=0)player.inventory.splice(idx,1);
+  } else if(item.type==='mana'){
+    if(player.mp>=player.maxmp){ addToast('Mana already full'); return; }
+    player.mp=Math.min(player.maxmp,player.mp+(item.mana||25));
+    item.count--; addToast('Restored mana');
+    if(item.count<=0)player.inventory.splice(idx,1);
+  }
+  renderInventory();
+}
+function renderInventory(){
+  const grid=document.getElementById('invGrid');
+  grid.innerHTML='';
+  player.inventory.forEach((item,idx)=>{
+    const slot=document.createElement('div');
+    slot.className='inv-slot'+(item.equipped?' equipped':'');
+    slot.innerHTML=`<div>${item.icon}</div>`+(item.count>1?`<div class="inv-count">${item.count}</div>`:'');
+    slot.title=item.name+(item.dmg?` (DMG ${item.dmg})`:'');
+    slot.onclick=()=>onInventoryClick(idx);
+    grid.appendChild(slot);
+  });
+  for(let i=player.inventory.length;i<12;i++){
+    const s=document.createElement('div'); s.className='inv-slot empty'; grid.appendChild(s);
+  }
+}
+function updateWeaponDisplay(){
+  document.getElementById('weaponIcon').textContent=player.weapon.icon;
+  document.getElementById('weaponName').textContent=player.weapon.name;
+  document.getElementById('weaponDmg').textContent='Damage '+player.weapon.dmg;
+}
+
+/* ============================= REGION TRANSITIONS ============================= */
+function enterRegion(index,fromSide){
+  currentRegionIndex=index;
+  const region=REGIONS[index];
+  generateRegionContent(region,index);
+  if(fromSide==='left'){ player.x=90; player.y=region.worldH/2; }
+  else if(fromSide==='right'){ player.x=region.worldW-90; player.y=region.worldH/2; }
+  else { player.x=90; player.y=region.worldH/2; }
+  region.visited=true;
+  showRegionCard(region.name, region.indoor?'You venture into the dark':'The wind carries you onward');
+  transitioning=false;
+}
+function transitionTo(index,fromSide){
+  if(transitioning)return;
+  transitioning=true;
+  document.getElementById('fadeOverlay').classList.add('show');
+  setTimeout(()=>{
+    enterRegion(index,fromSide);
+    setTimeout(()=>{ document.getElementById('fadeOverlay').classList.remove('show'); },80);
+  },420);
+}
+function checkPortals(){
+  if(transitioning)return;
+  const region=REGIONS[currentRegionIndex];
+  if(player.x<=20){
+    if(currentRegionIndex>0) transitionTo(currentRegionIndex-1,'right');
+  } else if(player.x>=region.worldW-20){
+    if(currentRegionIndex===7 && player.shards<5){
+      if(portalWarnCooldown<=0){
+        addToast(`🔒 The Fortress gate is sealed. Shadow Shards needed: ${player.shards}/5`);
+        portalWarnCooldown=3;
+      }
+      player.x=region.worldW-24;
+    } else if(currentRegionIndex<8){
+      transitionTo(currentRegionIndex+1,'left');
+    } else {
+      player.x=region.worldW-24;
+    }
+  }
+}
+function checkSecretReveal(){
+  const region=REGIONS[currentRegionIndex];
+  if(region.secret && !region.secret.revealed){
+    if(dist(player,region.secret)<80){
+      region.secret.revealed=true;
+      addToast('👀 You sense something hidden nearby...');
+    }
+  }
+}
+
+/* ============================= COMBAT ============================= */
+function doAttack(power){
+  if(gameState!=='playing')return;
+  if(player.attackCooldown>0)return;
+  let dmg=player.weapon.dmg;
+  player.attackPower=false;
+  if(power && player.mp>=10){
+    player.mp-=10; dmg*=2; player.attackPower=true; playPowerSwing();
+  } else {
+    playSwing();
+  }
+  player.attackCooldown=0.45; player.attackTimer=0.25; player.attacking=true;
+  const region=REGIONS[currentRegionIndex];
+  region.enemies.forEach(e=>{
+    if(!e.alive)return;
+    const dx=e.x-player.x, dy=e.y-player.y, d=Math.hypot(dx,dy);
+    if(d<player.radius+e.radius+50){
+      let angleTo=Math.atan2(dy,dx);
+      let diff=Math.abs(angleTo-player.facing);
+      if(diff>Math.PI)diff=2*Math.PI-diff;
+      if(diff<1.15){
+        e.hp-=dmg; e.hitFlash=0.15;
+        if(e.hp<=0 && e.alive){ e.alive=false; onEnemyKilled(e); }
+      }
+    }
+  });
+}
+function onEnemyKilled(e){
+  const gain=e.isBoss?150:(12+currentRegionIndex*3);
+  const gold=e.isBoss?120:(5+currentRegionIndex*2);
+  player.gold+=gold;
+  addToast(e.isBoss?`👑 ${e.name} has fallen!`:`${e.name} defeated! +${gain} XP, +${gold} Gold`);
+  gainXP(gain);
+  if(e.isBoss) setTimeout(triggerVictory,600);
+}
+function gainXP(n){
+  player.xp+=n;
+  while(player.xp>=player.maxxp){
+    player.xp-=player.maxxp; player.level++;
+    player.maxxp=Math.floor(player.maxxp*1.35);
+    player.maxhp+=15; player.maxmp+=8;
+    player.hp=player.maxhp; player.mp=player.maxmp;
+    addToast(`⭐ Level Up! You are now level ${player.level}`);
+    playLevelUp();
+  }
+}
+function doInteract(){
+  if(gameState==='dialog'){ closeDialog(); return; }
+  if(gameState!=='playing')return;
+  const region=REGIONS[currentRegionIndex];
+  for(const c of region.chests){
+    if(!c.opened && dist(player,c)<55){ openChest(c,false); return; }
+  }
+  if(region.secret && region.secret.revealed && !region.secret.opened && dist(player,region.secret)<55){
+    openChest(region.secret,true); return;
+  }
+  if(region.npc && dist(player,region.npc)<70){ showDialog(region.npc.text); return; }
+}
+function openChest(c,isSecret){
+  c.opened=true;
+  playChest();
+  addItem(c.item);
+  if(isSecret) addToast('🔓 A hidden path yields its treasure!');
+}
+
+/* ============================= UPDATE LOOP ============================= */
+function updateMovement(dt){
+  let dx=0,dy=0;
+  if(keys['w']||keys['arrowup'])dy-=1;
+  if(keys['s']||keys['arrowdown'])dy+=1;
+  if(keys['a']||keys['arrowleft'])dx-=1;
+  if(keys['d']||keys['arrowright'])dx+=1;
+  const region=REGIONS[currentRegionIndex];
+  if(dx!==0||dy!==0){
+    const len=Math.hypot(dx,dy); dx/=len; dy/=len;
+    player.x+=dx*player.speed*dt; player.y+=dy*player.speed*dt;
+    player.facing=Math.atan2(dy,dx); player.moving=true;
+  } else player.moving=false;
+  player.x=clamp(player.x,10,region.worldW-10);
+  player.y=clamp(player.y,18,region.worldH-18);
+  resolveCollisions(region);
+}
+function resolveCollisions(region){
+  region.obstacles.forEach(o=>{
+    const dx=player.x-o.x, dy=player.y-o.y, d=Math.hypot(dx,dy);
+    const minD=player.radius+o.r*0.65;
+    if(d<minD && d>0.001){ const push=(minD-d); player.x+=dx/d*push; player.y+=dy/d*push; }
+  });
+}
+function updateEnemies(dt){
+  const region=REGIONS[currentRegionIndex];
+  region.enemies.forEach(e=>{
+    if(!e.alive)return;
+    const dx=player.x-e.x, dy=player.y-e.y, d=Math.hypot(dx,dy);
+    const aggro=e.isBoss?340:200;
+    if(d<aggro && d>0.001){
+      e.x+=dx/d*e.speed*dt; e.y+=dy/d*e.speed*dt;
+      if(d<e.radius+player.radius+8 && e.hitCooldown<=0 && player.invuln<=0){
+        player.hp-=e.dmg; player.invuln=0.6; e.hitCooldown=0.9;
+        player.noHitTimer=0; playHit();
+        if(player.hp<=0){ player.hp=0; triggerGameOver(); }
+      }
+    } else {
+      e.wanderTimer-=dt;
+      if(e.wanderTimer<=0){ e.wanderAngle=Math.random()*Math.PI*2; e.wanderTimer=1.5+Math.random()*2; }
+      e.x+=Math.cos(e.wanderAngle)*e.speed*0.28*dt;
+      e.y+=Math.sin(e.wanderAngle)*e.speed*0.28*dt;
+    }
+    e.x=clamp(e.x,30,region.worldW-30); e.y=clamp(e.y,30,region.worldH-30);
+    if(e.hitCooldown>0)e.hitCooldown-=dt;
+    if(e.hitFlash>0)e.hitFlash-=dt;
+  });
+}
+function updateTimers(dt){
+  if(player.attackCooldown>0)player.attackCooldown-=dt;
+  if(player.attackTimer>0){ player.attackTimer-=dt; if(player.attackTimer<=0)player.attacking=false; }
+  if(player.invuln>0)player.invuln-=dt;
+  if(portalWarnCooldown>0)portalWarnCooldown-=dt;
+  player.mp=Math.min(player.maxmp,player.mp+4*dt);
+  player.noHitTimer+=dt;
+  if(player.noHitTimer>4)player.hp=Math.min(player.maxhp,player.hp+3*dt);
+  const region=REGIONS[currentRegionIndex];
+  if(region.weather.lightning){
+    region.lightningTimer-=dt;
+    if(region.lightningTimer<=0){
+      lightningFlash=1; region.lightningTimer=6+Math.random()*9; playThunder();
+    }
+  }
+  if(lightningFlash>0)lightningFlash=Math.max(0,lightningFlash-dt*2.6);
+}
+function updateAmbient(dt){
+  const region=REGIONS[currentRegionIndex];
+  region.birds.forEach(b=>{
+    b.x+=b.speed*dt;
+    if(b.x>region.worldW+60)b.x=-60;
+  });
+  region.fireflies.forEach(f=>{
+    f.vx+=(Math.random()-0.5)*4*dt; f.vy+=(Math.random()-0.5)*4*dt;
+    f.vx=clamp(f.vx,-14,14); f.vy=clamp(f.vy,-14,14);
+    f.x+=f.vx*dt; f.y+=f.vy*dt;
+    if(f.x<0||f.x>region.worldW)f.vx*=-1;
+    if(f.y<0||f.y>region.worldH)f.vy*=-1;
+    f.x=clamp(f.x,0,region.worldW); f.y=clamp(f.y,0,region.worldH);
+    f.phase+=dt*2;
+  });
+  if(region.weather.rain){
+    raindrops.forEach(r=>{
+      r.y+=r.speed*dt + (region.weather.wind?60*dt:0);
+      r.x+=(region.weather.wind?60*dt:0);
+      if(r.y>canvas.height){ r.y=-20; r.x=Math.random()*canvas.width; }
+      if(r.x>canvas.width){ r.x=0; }
+    });
+  }
+}
+
+/* ============================= RENDER ============================= */
+function getCam(region){
+  const camX=clamp(player.x-canvas.width/2,0,Math.max(0,region.worldW-canvas.width));
+  const camY=clamp(player.y-canvas.height/2,0,Math.max(0,region.worldH-canvas.height));
+  return {camX,camY};
+}
+function drawSky(region,nf){
+  const top=lerpColor(region.skyDay[0],region.skyNight[0],nf);
+  const bot=lerpColor(region.skyDay[1],region.skyNight[1],nf);
+  const g=ctx.createLinearGradient(0,0,0,canvas.height);
+  g.addColorStop(0,top); g.addColorStop(1,bot);
+  ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+function drawGround(region,camX,camY){
+  const tile=90;
+  const startX=Math.floor(camX/tile)*tile, startY=Math.floor(camY/tile)*tile;
+  for(let wx=startX; wx<camX+canvas.width+tile; wx+=tile){
+    for(let wy=startY; wy<camY+canvas.height+tile; wy+=tile){
+      const alt=(Math.floor(wx/tile)+Math.floor(wy/tile))%2===0;
+      ctx.fillStyle = alt ? shadeColor(region.ground,1) : shadeColor(region.ground,0.9);
+      ctx.fillRect(wx-camX,wy-camY,tile,tile);
+    }
+  }
+}
+function shadeColor(hex,factor){
+  const p=parseInt(hex.slice(1),16);
+  const r=clamp(Math.round(((p>>16)&255)*factor),0,255);
+  const g=clamp(Math.round(((p>>8)&255)*factor),0,255);
+  const b=clamp(Math.round((p&255)*factor),0,255);
+  return `rgb(${r},${g},${b})`;
+}
+function drawObstacle(o,camX,camY,region,time){
+  const x=o.x-camX, y=o.y-camY;
+  if(x<-60||x>canvas.width+60||y<-60||y>canvas.height+60)return;
+  const sway=region.weather.wind ? Math.sin(time*1.4+o.seed)*0.12 : 0;
+  ctx.save(); ctx.translate(x,y);
+  if(o.type==='tree'){
+    ctx.fillStyle='#4a3222'; ctx.fillRect(-4,-6,8,22);
+    ctx.rotate(sway);
+    ctx.beginPath(); ctx.fillStyle=shadeColor(region.ground==='#6fa84a'?'#3d6b2e':'#22381c',1);
+    ctx.arc(0,-o.r*0.6,o.r,0,Math.PI*2); ctx.fill();
+  } else if(o.type==='rock'){
+    ctx.fillStyle='#6e6259';
+    ctx.beginPath();
+    ctx.moveTo(-o.r,0); ctx.lineTo(-o.r*0.5,-o.r*0.9); ctx.lineTo(o.r*0.4,-o.r);
+    ctx.lineTo(o.r,-0.1*o.r); ctx.lineTo(o.r*0.6,o.r*0.3); ctx.lineTo(-o.r*0.6,o.r*0.4);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.stroke();
+  } else if(o.type==='pillar'){
+    ctx.fillStyle='#9c8862'; ctx.fillRect(-14,-70,28,70);
+    ctx.fillStyle='rgba(255,255,255,0.1)'; ctx.fillRect(-14,-70,6,70);
+    ctx.fillStyle='#7c6a4c'; ctx.fillRect(-18,-4,36,8);
+  } else if(o.type==='wall'){
+    ctx.fillStyle='#332f3d'; ctx.fillRect(-22,-40,44,44);
+    ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.strokeRect(-22,-40,44,44);
+    ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fillRect(-22,-40,44,10);
+  } else if(o.type==='crystal'){
+    const glow=6+Math.sin(time*3+o.seed)*4;
+    ctx.shadowColor='#7dd3fc'; ctx.shadowBlur=14+glow;
+    ctx.fillStyle='#7dd3fc';
+    ctx.beginPath();
+    ctx.moveTo(0,-o.r); ctx.lineTo(o.r*0.55,0); ctx.lineTo(0,o.r*0.7); ctx.lineTo(-o.r*0.55,0);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+  ctx.restore();
+}
+function drawChest(c,camX,camY,label){
+  const x=c.x-camX, y=c.y-camY;
+  if(c===REGIONS[currentRegionIndex].secret && !c.revealed){
+    return;
+  }
+  const glow = !c.opened ? (4+Math.sin(performance.now()/300)*3) : 0;
+  ctx.save(); ctx.translate(x,y);
+  if(!c.opened){ ctx.shadowColor=label?'#c084fc':'#f4d160'; ctx.shadowBlur=10+glow; }
+  ctx.fillStyle = c.opened ? '#5a4327' : '#8a5a2b';
+  ctx.fillRect(-18,-14,36,24);
+  ctx.fillStyle='#3d2c17'; ctx.fillRect(-18, c.opened?-24:-14, 36, 8);
+  ctx.fillStyle='#f4d160'; ctx.fillRect(-3,-10,6,16);
+  ctx.shadowBlur=0;
+  ctx.restore();
+}
+function drawNPC(npc,camX,camY,time){
+  const x=npc.x-camX, y=npc.y-camY;
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='#3a5a8a'; ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#e8c9a0'; ctx.beginPath(); ctx.arc(0,-18,8,0,Math.PI*2); ctx.fill();
+  const bob=Math.sin(time*2)*4;
+  ctx.fillStyle='#f4d160'; ctx.font='bold 18px Georgia';
+  ctx.textAlign='center'; ctx.fillText('!',0,-34+bob);
+  ctx.restore();
+}
+function drawEnemy(e,camX,camY){
+  const x=e.x-camX, y=e.y-camY;
+  if(x<-60||x>canvas.width+60||y<-60||y>canvas.height+60)return;
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle = e.hitFlash>0 ? '#ffffff' : e.color;
+  ctx.beginPath(); ctx.arc(0,0,e.radius,0,Math.PI*2); ctx.fill();
+  if(e.isBoss){
+    ctx.fillStyle='#f4d160'; ctx.beginPath();
+    ctx.moveTo(-14,-e.radius-2); ctx.lineTo(-6,-e.radius-14); ctx.lineTo(0,-e.radius-4);
+    ctx.lineTo(6,-e.radius-14); ctx.lineTo(14,-e.radius-2); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(-5,-3,3,0,Math.PI*2); ctx.arc(5,-3,3,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#a00';
+  ctx.beginPath(); ctx.arc(-5,-3,1.3,0,Math.PI*2); ctx.arc(5,-3,1.3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  if(e.hp<e.maxhp){
+    const w=e.radius*2.2;
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(x-w/2,y-e.radius-14,w,5);
+    ctx.fillStyle='#c0392b'; ctx.fillRect(x-w/2,y-e.radius-14,w*(e.hp/e.maxhp),5);
+  }
+  if(e.isBoss){
+    ctx.fillStyle='var(--gold-bright)'.startsWith('var')?'#f4d160':'#f4d160';
+    ctx.font='11px Georgia'; ctx.textAlign='center';
+    ctx.fillStyle='#f4d160'; ctx.fillText(e.name,x,y-e.radius-20);
+  }
+}
+function drawPlayer(camX,camY,time){
+  const x=player.x-camX, y=player.y-camY;
+  ctx.save(); ctx.translate(x,y);
+  if(player.invuln>0 && Math.floor(time*20)%2===0) ctx.globalAlpha=0.5;
+  ctx.fillStyle='#4b3269';
+  ctx.beginPath(); ctx.arc(0,0,player.radius,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#f4d160'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#e8c9a0';
+  ctx.beginPath(); ctx.arc(Math.cos(player.facing)*4,Math.sin(player.facing)*4-2,7,0,Math.PI*2); ctx.fill();
+  if(player.attacking){
+    const t=1-(player.attackTimer/0.25);
+    const startA=player.facing-1.0, endA=player.facing+1.0;
+    const a=startA+(endA-startA)*t;
+    ctx.strokeStyle=player.attackPower?'rgba(155,89,182,0.95)':'rgba(244,209,96,0.9)';
+    ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(a)*38,Math.sin(a)*38); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,36,startA,a); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawWeather(region,camX,camY,nf,time){
+  if(region.weather.birds && nf<0.55){
+    ctx.strokeStyle='rgba(30,20,10,0.7)'; ctx.lineWidth=2;
+    region.birds.forEach(b=>{
+      const x=b.x-camX, y=b.y+Math.sin(b.phase+b.x*0.01)*18-camY;
+      if(x<-30||x>canvas.width+30)return;
+      ctx.beginPath();
+      ctx.moveTo(x-8,y); ctx.quadraticCurveTo(x-4,y-6,x,y);
+      ctx.quadraticCurveTo(x+4,y-6,x+8,y);
+      ctx.stroke();
+    });
+  }
+  if(region.weather.fireflies && nf>0.4){
+    region.fireflies.forEach(f=>{
+      const x=f.x-camX, y=f.y-camY;
+      if(x<-20||x>canvas.width+20||y<-20||y>canvas.height+20)return;
+      const alpha=0.4+Math.sin(f.phase)*0.4;
+      ctx.save();
+      ctx.globalAlpha=Math.max(0,alpha);
+      ctx.shadowColor='#f9e37a'; ctx.shadowBlur=8;
+      ctx.fillStyle='#f9e37a';
+      ctx.beginPath(); ctx.arc(x,y,2.2,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+  }
+  if(region.weather.rain){
+    ctx.strokeStyle='rgba(180,200,230,0.35)'; ctx.lineWidth=1;
+    raindrops.forEach(r=>{
+      ctx.beginPath(); ctx.moveTo(r.x,r.y); ctx.lineTo(r.x-3,r.y+r.len); ctx.stroke();
+    });
+  }
+  if(region.weather.torches){
+    region.torches.forEach(t=>{
+      const x=t.x-camX, y=t.y-camY;
+      if(x<-30||x>canvas.width+30||y<-30||y>canvas.height+30)return;
+      ctx.fillStyle='#3a2a1a'; ctx.fillRect(x-3,y-20,6,26);
+      const flick=Math.random()*4;
+      ctx.save();
+      ctx.shadowColor='#ff8c3a'; ctx.shadowBlur=18+flick;
+      const grad=ctx.createRadialGradient(x,y-26,0,x,y-26,14+flick);
+      grad.addColorStop(0,'rgba(255,220,140,0.95)');
+      grad.addColorStop(1,'rgba(255,120,30,0)');
+      ctx.fillStyle=grad;
+      ctx.beginPath(); ctx.arc(x,y-26,14+flick,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    });
+  }
+}
+function drawLightGradient(c,x,y,radius){
+  const g=c.createRadialGradient(x,y,0,x,y,radius);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(0.65,'rgba(255,255,255,0.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  c.fillStyle=g;
+  c.beginPath(); c.arc(x,y,radius,0,Math.PI*2); c.fill();
+}
+function drawLighting(region,camX,camY,nf){
+  lctx.clearRect(0,0,canvas.width,canvas.height);
+  let darkAlpha = region.indoor ? (0.55+nf*0.25) : (0.08+nf*0.62);
+  lctx.fillStyle=`rgba(4,4,12,${darkAlpha})`;
+  lctx.fillRect(0,0,canvas.width,canvas.height);
+  lctx.globalCompositeOperation='destination-out';
+  drawLightGradient(lctx, player.x-camX, player.y-camY, 150);
+  region.torches.forEach(t=>drawLightGradient(lctx, t.x-camX, t.y-camY, 120));
+  if(region.weather.crystals){
+    region.obstacles.filter(o=>o.type==='crystal').forEach(cObj=>{
+      drawLightGradient(lctx, cObj.x-camX, cObj.y-camY, 75);
+    });
+  }
+  lctx.globalCompositeOperation='source-over';
+  ctx.drawImage(lightingCanvas,0,0);
+  if(lightningFlash>0){
+    ctx.fillStyle=`rgba(255,255,255,${lightningFlash*0.55})`;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+}
+function render(time){
+  const region=REGIONS[currentRegionIndex];
+  const nf=nightFactor();
+  const {camX,camY}=getCam(region);
+  drawSky(region,nf);
+  drawGround(region,camX,camY);
+  region.obstacles.forEach(o=>drawObstacle(o,camX,camY,region,time));
+  region.chests.forEach(c=>drawChest(c,camX,camY,false));
+  if(region.secret && region.secret.revealed) drawChest(region.secret,camX,camY,true);
+  if(region.npc) drawNPC(region.npc,camX,camY,time);
+  region.enemies.forEach(e=>{ if(e.alive) drawEnemy(e,camX,camY); });
+  drawPlayer(camX,camY,time);
+  drawWeather(region,camX,camY,nf,time);
+  drawLighting(region,camX,camY,nf);
+}
+
+/* ============================= HUD UPDATE ============================= */
+function updateHUD(){
+  document.getElementById('hpFill').style.width=(player.hp/player.maxhp*100)+'%';
+  document.getElementById('hpLabel').textContent=Math.ceil(player.hp)+'/'+player.maxhp;
+  document.getElementById('mpFill').style.width=(player.mp/player.maxmp*100)+'%';
+  document.getElementById('mpLabel').textContent=Math.ceil(player.mp)+'/'+player.maxmp;
+  document.getElementById('xpFill').style.width=(player.xp/player.maxxp*100)+'%';
+  document.getElementById('xpLabel').textContent=Math.floor(player.xp)+'/'+player.maxxp;
+  document.getElementById('levelBadge').textContent='Lv '+player.level;
+  document.getElementById('goldCount').textContent=player.gold;
+  document.getElementById('shardCount').textContent=player.shards+'/5';
+  const nf=nightFactor();
+  const icon=document.getElementById('dayNightIcon'), label=document.getElementById('dayNightLabel');
+  if(nf<0.3){ icon.textContent='☀️'; label.textContent='Day'; }
+  else if(nf<0.6){ icon.textContent='🌇'; label.textContent='Twilight'; }
+  else { icon.textContent='🌙'; label.textContent='Night'; }
+  document.getElementById('questText').textContent=REGIONS[currentRegionIndex].quest;
+  updateMinimap();
+}
+function updateMinimap(){
+  const region=REGIONS[currentRegionIndex];
+  const w=minimapCanvas.width, h=minimapCanvas.height;
+  mctx.clearRect(0,0,w,h);
+  mctx.fillStyle='rgba(10,8,16,0.65)'; mctx.fillRect(0,0,w,h);
+  const sx=w/region.worldW, sy=h/region.worldH;
+  region.chests.forEach(c=>{
+    if(c.opened)return;
+    mctx.fillStyle='#f4d160';
+    mctx.beginPath(); mctx.arc(c.x*sx,c.y*sy,2.4,0,Math.PI*2); mctx.fill();
+  });
+  if(region.secret && region.secret.revealed && !region.secret.opened){
+    mctx.fillStyle='#c084fc';
+    mctx.beginPath(); mctx.arc(region.secret.x*sx,region.secret.y*sy,2.6,0,Math.PI*2); mctx.fill();
+  }
+  region.enemies.forEach(e=>{
+    if(!e.alive)return;
+    mctx.fillStyle=e.isBoss?'#ff3030':'rgba(220,60,60,0.85)';
+    mctx.beginPath(); mctx.arc(e.x*sx,e.y*sy,e.isBoss?3.2:1.8,0,Math.PI*2); mctx.fill();
+  });
+  mctx.fillStyle='#fff';
+  mctx.beginPath(); mctx.arc(player.x*sx,player.y*sy,3,0,Math.PI*2); mctx.fill();
+  mctx.strokeStyle='rgba(212,175,55,0.6)'; mctx.strokeRect(0.5,0.5,w-1,h-1);
+}
+
+/* ============================= GAME STATE TRANSITIONS ============================= */
+function triggerVictory(){
+  gameState='victory';
+  playVictory();
+  const elapsed=Math.floor((performance.now()-startTime)/1000);
+  const mm=Math.floor(elapsed/60), ss=elapsed%60;
+  document.getElementById('victoryStats').innerHTML=
+    `Level reached: <span>${player.level}</span><br>Gold collected: <span>${player.gold}</span><br>`+
+    `Shadow Shards found: <span>${player.shards}</span><br>Time played: <span>${mm}m ${ss}s</span>`;
+  document.getElementById('victoryOverlay').classList.add('show');
+}
+function triggerGameOver(){
+  gameState='gameover';
+  document.getElementById('gameoverOverlay').classList.add('show');
+}
+document.getElementById('victoryRestart').onclick=()=>location.reload();
+document.getElementById('gameoverRestart').onclick=()=>location.reload();
+document.getElementById('startBtn').onclick=()=>{
+  document.getElementById('titleScreen').classList.remove('show');
+  document.getElementById('hud').style.display='block';
+  initAudio();
+  gameState='playing';
+  startTime=performance.now();
+  renderInventory();
+  updateWeaponDisplay();
+  enterRegion(0,'start');
+};
+
+/* ============================= MAIN LOOP ============================= */
+// Pre-generate the first region's content immediately so the very first
+// render (which happens before "Begin Journey" is clicked) has valid data.
+generateRegionContent(REGIONS[0],0);
+
+let lastTime=performance.now();
+function loop(now){
+  try{
+    const dt=Math.min((now-lastTime)/1000,0.05);
+    lastTime=now;
+    if(gameState==='playing'){
+      dayTime+=dt/DAY_LENGTH; if(dayTime>=1)dayTime-=1;
+      updateMovement(dt);
+      updateEnemies(dt);
+      updateTimers(dt);
+      updateAmbient(dt);
+      checkPortals();
+      checkSecretReveal();
+    }
+    render(now/1000);
+    if(gameState==='playing'||gameState==='dialog') updateHUD();
+  }catch(err){
+    // Never let a single bad frame permanently freeze the game loop.
+    console.error('Kingdom of Shadows frame error:',err);
+  }
+  requestAnimationFrame(loop);
+}
+resize();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
